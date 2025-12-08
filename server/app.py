@@ -6,14 +6,25 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 import requests
+import urllib.parse
 
 app = Flask(__name__)
 CORS(app)
 
-# --- CONFIGURATION (SQLite) ---
-# Veritabanı dosyası 'instance' klasörü veya ana dizinde oluşacaktır.
-basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'visionfix.db')
+# --- CONFIGURATION (MSSQL) ---
+# MSSQL CONFIGURATION
+# CCE içinde "mssql-service" ismini kullanacağız (DNS çözümlemesi yapar)
+server = os.environ.get('DB_SERVER', 'mssql-service') 
+database = os.environ.get('DB_NAME', 'VisionFixDB')
+username = os.environ.get('DB_USER', 'sa')
+password = os.environ.get('DB_PASSWORD') # Yukarıda belirlediğin şifre
+
+driver = '{ODBC Driver 17 for SQL Server}'
+connection_string = f'DRIVER={driver};SERVER={server};DATABASE={database};UID={username};PWD={password};'
+
+params = urllib.parse.quote_plus(connection_string)
+app.config['SQLALCHEMY_DATABASE_URI'] = "mssql+pyodbc:///?odbc_connect=%s" % params
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = 'change-this-to-a-secure-secret-key'  # Security key
 
@@ -44,29 +55,43 @@ class Analysis(db.Model):
 
 # --- AI FUNCTION ---
 def get_ai_estimation(damage_description):
+    
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {API_TOKEN}"
     }
+
+    # Promptu zenginleştiriyoruz ki cevap profesyonel dursun
+    system_prompt = (
+        "You are an expert vehicle damage assessor AI. "
+        "The user will describe a vehicle damage. "
+        "Even though you cannot see the image, trust the user's description completely. "
+        "Provide a detailed repair cost estimate (in USD) and a required parts list. "
+        "Format your response nicely."
+    )
+
     payload = {
-        "model": MODEL_NAME,
+        "model": MODEL_NAME, 
         "messages": [
-            {"role": "system", "content": "You are an expert vehicle damage assessor. Provide a repair cost estimate in USD and parts list based on the description."},
-            {"role": "user", "content": damage_description}
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"The vehicle has the following damage: {damage_description}. Please provide an assessment."}
         ],
         "max_tokens": 1024,
         "temperature": 0.3
     }
+    
     try:
         response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
         if response.status_code == 200:
             return response.json()['choices'][0]['message']['content']
-        return f"AI Error: {response.status_code}"
+        else:
+            print("AI API Error:", response.text)
+            return f"AI Error: {response.status_code} (Model text-only mode)"
     except Exception as e:
+        print("AI Connection Error:", str(e))
         return "Failed to connect to AI server."
-
+    
 # --- ENDPOINTS ---
-
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
@@ -101,13 +126,17 @@ def analyze():
     file = request.files['file']
     description = request.form.get('description', 'General damage analysis')
     
-    # AI Analysis
+    # 1. Adım: Resmi OKU (Veritabanı için)
+    file_bytes = file.read() 
+    
+    # 2. Adım: AI Analizi 
+
     ai_result = get_ai_estimation(description)
     
-    # Save to Database
+    # 3. Adım: Veritabanına Kaydet (Hem resmi hem raporu)
     new_analysis = Analysis(
         user_id=current_user_id,
-        image_data=file.read(),
+        image_data=file_bytes, # Resim binary olarak saklanır
         description=description,
         ai_report=ai_result
     )
@@ -115,6 +144,28 @@ def analyze():
     db.session.commit()
     
     return jsonify({"success": True, "report": ai_result})
+
+@app.route('/api/history', methods=['GET'])
+@jwt_required()
+def get_history():
+    current_user_id = get_jwt_identity()
+    
+    # Kullanıcının analizlerini ID'ye göre tersten (en yeni en üstte) sırala
+    user_analyses = Analysis.query.filter_by(user_id=current_user_id).order_by(Analysis.id.desc()).all()
+    
+    history_data = []
+    for analysis in user_analyses:
+        # Görsel verisini (bytes) base64 string'e çeviriyoruz ki frontend gösterebilsin
+        encoded_img = base64.b64encode(analysis.image_data).decode('utf-8')
+        
+        history_data.append({
+            "id": analysis.id,
+            "description": analysis.description,
+            "ai_report": analysis.ai_report,
+            "image": f"data:image/jpeg;base64,{encoded_img}" # React için hazır format
+        })
+        
+    return jsonify(history_data)
 
 # --- VERİTABANI OLUŞTURMA ---
 # Uygulama her başladığında tabloları kontrol eder, yoksa oluşturur.

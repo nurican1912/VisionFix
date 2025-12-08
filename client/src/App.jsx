@@ -64,11 +64,17 @@ function AuthPage({ setIsAuthenticated }) {
 
 // --- Main Application (Dashboard) Component ---
 function Dashboard({ handleLogout }) {
+  const [view, setView] = useState('new');
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [description, setDescription] = useState("");
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
+  
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const [selectedImage, setSelectedImage] = useState(null);
 
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
@@ -95,52 +101,113 @@ function Dashboard({ handleLogout }) {
       setReport(response.data.report);
     } catch (error) {
       console.error("Error:", error);
-      if(error.response && error.response.status === 401) handleLogout(); // Logout if token is invalid
+      if(error.response && error.response.status === 401) handleLogout();
       else alert("Analysis failed.");
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchHistory = async () => {
+    setView('history');
+    setHistoryLoading(true);
+    const token = localStorage.getItem('token');
+    try {
+      const res = await axios.get('http://127.0.0.1:5000/api/history', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setHistory(res.data);
+    } catch (error) {
+      console.error("History fetch error", error);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   return (
     <div className="app-container">
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-        <h1>VisionFix <span className="beta">PRO</span></h1>
-        <button onClick={handleLogout} style={{background:'transparent', border:'1px solid white', color:'white', padding:'5px 15px', borderRadius:'5px', cursor:'pointer'}}>Logout</button>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px', borderBottom:'1px solid rgba(255,255,255,0.2)', paddingBottom:'15px'}}>
+        <h1 style={{margin:0, fontSize:'1.8rem'}}>VisionFix <span className="beta">PRO</span></h1>
+        
+        <div style={{display:'flex', gap:'10px'}}>
+          <button onClick={() => setView('new')} className={`nav-btn ${view === 'new' ? 'active' : ''}`}>New Analysis</button>
+          <button onClick={fetchHistory} className={`nav-btn ${view === 'history' ? 'active' : ''}`}>My History</button>
+          <button onClick={handleLogout} className="logout-btn">Logout</button>
+        </div>
       </div>
 
-      <div className="upload-area">
-        <label htmlFor="file-upload" className="file-label">
-          {preview ? "Change Photo" : "📸 Upload Damage Photo"}
-        </label>
-        <input id="file-upload" type="file" onChange={handleFileChange} accept="image/*" />
+      {view === 'new' && (
+        <div className="upload-area animation-fade">
+          <label htmlFor="file-upload" className="file-label">
+            {preview ? "🔄 Change Photo" : "📸 Upload Damage Photo"}
+          </label>
+          <input id="file-upload" type="file" onChange={handleFileChange} accept="image/*" />
 
-        {preview && (
-          <div className="preview-box">
-            <img src={preview} alt="Preview" />
-          </div>
-        )}
+          {preview && (
+            <div className="preview-box">
+              <img src={preview} alt="Preview" />
+            </div>
+          )}
 
-        <textarea 
-          placeholder="Describe the damage (e.g., Broken front bumper, scratched headlight)..."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows="4"
-        ></textarea>
+          <textarea 
+            placeholder="Describe the damage (e.g., Broken front bumper)..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows="4"
+          ></textarea>
 
-        <button onClick={handleAnalyze} disabled={loading || !file} className="btn btn-primary">
-          {loading ? "Analyzing..." : "Analyze with AI"}
-        </button>
-      </div>
+          <button onClick={handleAnalyze} disabled={loading || !file} className="btn btn-primary">
+            {loading ? "Analyzing..." : "Analyze with AI"}
+          </button>
 
-      {report && (
-        <div className="result-section">
-          <h3>📋 AI Assessment Report</h3>
-          <div className="report-content">
-            <pre>{report}</pre>
+          {report && (
+            <div className="result-section">
+              <h3>📋 AI Assessment Report</h3>
+              <div className="report-content">
+                <pre>{report}</pre>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {view === 'history' && (
+        <div className="history-area animation-fade">
+          {historyLoading ? <p>Loading history...</p> : (
+            history.length === 0 ? <p>No past analysis found.</p> : (
+              <div className="history-grid">
+                {history.map((item) => (
+                  <div key={item.id} className="history-card">
+                    <div className="history-img">
+                      <img 
+                        src={item.image} 
+                        alt="Damage" 
+                        onClick={() => setSelectedImage(item.image)} 
+                        title="Click to Enlarge"
+                      />
+                    </div>
+                    <div className="history-content">
+                      <h4>Description: {item.description}</h4>
+                      <hr style={{borderColor:'rgba(255,255,255,0.1)'}}/>
+                      <pre className="small-report">{item.ai_report}</pre>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+        </div>
+      )}
+
+      {selectedImage && (
+        <div className="image-modal" onClick={() => setSelectedImage(null)}>
+          <div className="modal-content">
+            <span className="close-btn">&times;</span>
+            <img src={selectedImage} alt="Full Size" />
           </div>
         </div>
       )}
+
     </div>
   );
 }

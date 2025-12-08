@@ -159,3 +159,165 @@ input[type="file"] {
   background: rgba(255,255,255,0.1);
   border-color: #fff;
 }
+
+/* Navigasyon Butonları */
+.nav-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ddd;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.nav-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.nav-btn.active {
+  background: #4facfe;
+  border-color: #4facfe;
+  color: #fff;
+  font-weight: 600;
+}
+
+.logout-btn {
+  background: rgba(255, 71, 87, 0.2);
+  border: 1px solid #ff4757;
+  color: #ff4757;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.logout-btn:hover {
+  background: #ff4757;
+  color: white;
+}
+
+/* History Grid Yapısı */
+.history-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: 600px; /* Çok fazla kayıt olursa sayfa uzamasın, scroll olsun */
+  overflow-y: auto;
+  padding-right: 10px; /* Scrollbar için boşluk */
+}
+
+/* History Kart Tasarımı (Glassmorphism Uyumlu) */
+.history-card {
+  display: flex;
+  gap: 20px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 15px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: transform 0.2s;
+}
+
+.history-card:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.history-img img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.history-content {
+  flex: 1;
+}
+
+.history-content h4 {
+  margin: 0 0 10px 0;
+  font-size: 1rem;
+  color: #4facfe;
+}
+
+.small-report {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: #e0e0e0;
+  max-height: 100px; /* Rapor çok uzunsa kısalt */
+  overflow-y: auto;
+  opacity: 0.9;
+}
+
+/* Scrollbar Düzenlemesi (Webkit) */
+.history-grid::-webkit-scrollbar, .small-report::-webkit-scrollbar {
+  width: 6px;
+}
+.history-grid::-webkit-scrollbar-thumb, .small-report::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.animation-fade {
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+.history-img img {
+  cursor: zoom-in; /* Üzerine gelince büyüteç çıkar */
+  transition: transform 0.2s;
+}
+
+.history-img img:hover {
+  transform: scale(1.05); /* Üzerine gelince hafif büyür */
+}
+
+/* Modal Arka Planı (Karanlık Perde) */
+.image-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85); /* Arkadaki her şeyi karart */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000; /* En üstte durması için */
+  animation: fadeIn 0.3s ease;
+  cursor: zoom-out;
+}
+
+/* Modal İçeriği */
+.modal-content {
+  position: relative;
+  max-width: 90%;
+  max-height: 90%;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.modal-content img {
+  width: 100%;
+  height: auto;
+  max-height: 85vh; /* Ekrandan taşmaması için */
+  display: block;
+  border-radius: 8px;
+}
+
+/* Kapatma Çarpısı (İsteğe bağlı, zaten boşluğa tıklayınca kapanıyor) */
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  color: white;
+  font-size: 30px;
+  font-weight: bold;
+  cursor: pointer;
+  text-shadow: 0 0 5px black;
+  transition: 0.3s;
+}
+
+.close-btn:hover {
+  color: #ff4757;
+}
