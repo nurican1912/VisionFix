@@ -4,7 +4,7 @@ import time
 import pyodbc
 import requests
 import urllib.parse
-from google import genai  # Yeni SDK
+from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
@@ -37,7 +37,6 @@ db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
 # --- HIBRIT AI YAPILANDIRMASI (YENİ SDK) ---
-# v1beta hatasını önlemek için doğrudan stabil v1 kanalını kullanan yeni istemci
 client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
 
 HUAWEI_API_URL = os.getenv('HUAWEI_API_URL')
@@ -86,9 +85,9 @@ def get_ai_estimation(damage_description, image_base64):
         # Adım 1: Gemini Perception (Yeni google-genai SDK kullanımı)
         image_bytes = base64.b64decode(image_base64)
         
-        # Yeni SDK'da generate_content kullanımı
+        # HATA DÜZELTİLDİ: model="gemini-1.5-flash" yerine güncel model olan "gemini-2.5-flash" kullanıldı.
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             contents=[
                 f"Analyze this vehicle damage technically. Identify specific issues. User description: {damage_description}",
                 types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")

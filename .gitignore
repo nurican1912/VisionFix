@@ -1,0 +1,65 @@
+# =========================
+# Backend (Server - Python/Flask)
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Sanal ortamlar
+venv/
+env/
+.env/
+.venv/
+
+# Hassas veriler ve Çevresel Değişkenler
+.env
+*.pem
+
+# Flask
+instance/
+.webassets-cache
+
+# =========================
+# Frontend (Client - React/Vite/Node)
+# =========================
+# Bağımlılıklar
+node_modules/
+/client/node_modules/
+
+# Derlenmiş/Build edilmiş dosyalar
+dist/
+dist-ssr/
+build/
+
+# Log dosyaları
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Vite / React
+*.local
+.eslintcache
+
+# =========================
+# Genel / IDE / İşletim Sistemi
+# =========================
+# Mac OS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editörler (VS Code, IntelliJ vb.)
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
