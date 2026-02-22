@@ -12,9 +12,10 @@ function AuthPage({ setIsAuthenticated }) {
   const navigate = useNavigate();
 
   const handleAuth = async () => {
+    // Vite Proxy sayesinde artık tam URL yazmamıza gerek yok
     const endpoint = isLogin ? '/login' : '/register';
     try {
-      const res = await axios.post(`http://127.0.0.1:5000/api${endpoint}`, { username, password });
+      const res = await axios.post(`/api${endpoint}`, { username, password });
       
       if (isLogin) {
         localStorage.setItem('token', res.data.access_token);
@@ -95,7 +96,8 @@ function Dashboard({ handleLogout }) {
     const token = localStorage.getItem('token');
 
     try {
-      const response = await axios.post('http://127.0.0.1:5000/api/analyze', formData, {
+      // Relative path kullanımı
+      const response = await axios.post('/api/analyze', formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setReport(response.data.report);
@@ -113,7 +115,8 @@ function Dashboard({ handleLogout }) {
     setHistoryLoading(true);
     const token = localStorage.getItem('token');
     try {
-      const res = await axios.get('http://127.0.0.1:5000/api/history', {
+      // Relative path kullanımı
+      const res = await axios.get('/api/history', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setHistory(res.data);

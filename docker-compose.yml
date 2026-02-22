@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # MSSQL Veritabanı Servisi
+  db:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: visionfix-db
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=${DB_PASSWORD} # .env dosyasındaki DB_PASSWORD'ü buraya bağlar
+    ports:
+      - "1433:1433"
+    networks:
+      - visionfix-network
+
+  # Flask Backend Servisi
+  backend:
+    build: 
+      context: ./server
+    container_name: visionfix-backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./server/.env # Tüm API keyleri ve DB ayarlarını buradan okur
+    environment:
+      - DB_SERVER=db # Kodun içindeki db servisine ulaşması için
+    depends_on:
+      - db
+    networks:
+      - visionfix-network
+
+networks:
+  visionfix-network:
+    driver: bridge
