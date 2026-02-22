@@ -12,12 +12,19 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename 
 
 # 1. Ortam değişkenlerini yükle
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+
+# GÜVENLİK YAMASI 2: CORS Kısıtlaması
+CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost"]}})
+
+# GÜVENLİK YAMASI 1.1: Maksimum Dosya Boyutu (5 MB)
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
 # --- VERİTABANI YAPILANDIRMASI ---
 server = os.getenv('DB_SERVER', 'mssql-service') 
@@ -36,9 +43,8 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'VisionFix_2026_ADU_C
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
-# --- HIBRIT AI YAPILANDIRMASI (YENİ SDK) ---
+# --- HIBRIT AI YAPILANDIRMASI ---
 client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
-
 HUAWEI_API_URL = os.getenv('HUAWEI_API_URL')
 HUAWEI_TOKEN = os.getenv('HUAWEI_TOKEN')
 HUAWEI_MODEL = os.getenv('HUAWEI_MODEL', 'deepseek-v3.1')
@@ -57,6 +63,10 @@ class Analysis(db.Model):
     image_data = db.Column(db.LargeBinary, nullable=False)
     description = db.Column(db.String(500), nullable=True)
     ai_report = db.Column(db.Text, nullable=True)
+
+# GÜVENLİK YAMASI 1.2: Dosya uzantısı kontrol fonksiyonu
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # --- MSSQL BAŞLATMA ---
 def initialize_database():
@@ -79,13 +89,11 @@ def initialize_database():
             time.sleep(5)
     return False
 
-# --- HIBRIT AI MOTORU (YENİ SDK MİMARİSİ) ---
+# --- HIBRIT AI MOTORU ---
 def get_ai_estimation(damage_description, image_base64):
     try:
-        # Adım 1: Gemini Perception (Yeni google-genai SDK kullanımı)
         image_bytes = base64.b64decode(image_base64)
         
-        # HATA DÜZELTİLDİ: model="gemini-1.5-flash" yerine güncel model olan "gemini-2.5-flash" kullanıldı.
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
@@ -94,10 +102,8 @@ def get_ai_estimation(damage_description, image_base64):
             ]
         )
         
-        # Yanıtı alırken yeni yapıya uygun şekilde erişiyoruz
         perceived_data = response.text if response.text else damage_description
 
-        # Adım 2: Huawei DeepSeek Reasoning
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {HUAWEI_TOKEN}"}
         payload = {
             "model": HUAWEI_MODEL,
@@ -119,9 +125,22 @@ def get_ai_estimation(damage_description, image_base64):
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
-    if User.query.filter_by(username=data['username']).first():
-        return jsonify({"msg": "Username mevcut"}), 400
-    new_user = User(username=data['username'], password_hash=generate_password_hash(data['password']))
+    
+    # GÜVENLİK YAMASI 4: Girdi Doğrulaması
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    
+    if not username or not password:
+        return jsonify({"msg": "Kullanıcı adı ve şifre boş bırakılamaz"}), 400
+    if len(username) < 3 or len(username) > 50:
+        return jsonify({"msg": "Kullanıcı adı 3-50 karakter arasında olmalıdır"}), 400
+    if len(password) < 6:
+        return jsonify({"msg": "Şifre en az 6 karakter olmalıdır"}), 400
+
+    if User.query.filter_by(username=username).first():
+        return jsonify({"msg": "Kullanıcı adı zaten mevcut"}), 400
+        
+    new_user = User(username=username, password_hash=generate_password_hash(password))
     db.session.add(new_user)
     db.session.commit()
     return jsonify({"msg": "Kayıt başarılı"}), 201
@@ -129,17 +148,28 @@ def register():
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
-    user = User.query.filter_by(username=data['username']).first()
-    if user and check_password_hash(user.password_hash, data['password']):
+    user = User.query.filter_by(username=data.get('username')).first()
+    if user and check_password_hash(user.password_hash, data.get('password')):
         return jsonify(access_token=create_access_token(identity=str(user.id)))
-    return jsonify({"msg": "Hatalı giriş"}), 401
+    return jsonify({"msg": "Hatalı kullanıcı adı veya şifre"}), 401
 
 @app.route('/api/analyze', methods=['POST'])
 @jwt_required()
 def analyze():
     current_user_id = get_jwt_identity()
-    if 'file' not in request.files: return jsonify({"error": "Dosya eksik"}), 400
+    
+    # GÜVENLİK YAMASI 1.3: Dosya Varlığı ve Türü Kontrolü
+    if 'file' not in request.files: 
+        return jsonify({"error": "Dosya isteğe eklenmemiş"}), 400
+        
     file = request.files['file']
+    
+    if file.filename == '':
+        return jsonify({"error": "Seçili dosya yok"}), 400
+        
+    if not allowed_file(file.filename):
+        return jsonify({"error": "Sadece JPG ve PNG dosyaları kabul edilmektedir"}), 400
+
     description = request.form.get('description', 'Genel hasar analizi')
     
     try:
@@ -153,7 +183,7 @@ def analyze():
         return jsonify({"success": True, "report": ai_result})
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Analiz sırasında bir hata oluştu"}), 500
 
 @app.route('/api/history', methods=['GET'])
 @jwt_required()
@@ -174,4 +204,7 @@ if __name__ == '__main__':
     with app.app_context():
         if initialize_database():
             db.create_all()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+            
+    # GÜVENLİK YAMASI 3: Debug Modunu kapattık
+    is_debug = os.getenv('FLASK_DEBUG', '0') == '1'
+    app.run(debug=is_debug, host='0.0.0.0', port=5000)
